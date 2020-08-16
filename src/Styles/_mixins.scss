@@ -1,0 +1,17 @@
+@mixin font-props($size, $letter-spacing, $line-height) {
+  font-size: #{$size}px;
+  letter-spacing: #{decimal-round($letter-spacing / $size, 2)}em;
+  line-height: #{$line-height}em;
+}
+
+@mixin gt-medium($size, $letter-spacing, $line-height) {
+  @include font-props($size, $letter-spacing, $line-height);
+  font-family: 'GT America Medium', sans-serif;
+  margin-left: -#{decimal-round($letter-spacing / $size, 2)}em;
+}
+
+@mixin gt-light($size, $letter-spacing, $line-height) {
+  @include font-props($size, $letter-spacing, $line-height);
+  font-family: 'GT America Light', sans-serif;
+  margin-left: -#{decimal-round($letter-spacing / $size, 2)}em;
+}
