@@ -46,12 +46,24 @@ const TWITCH_OPTIONS = {
   ],
 };
 
-const Socket = function() {
+const Socket = function(createSubWindow) {
   this.socket = null;
   this.client = null;
+  this.room = null;
+  this.roomCode = channelName;
+  this.commands = {
+    resolvers: {},
+    pluginObjects: {},
+  };
+  this.createSubWindow = createSubWindow;
 }
 Socket.prototype.init = function() {
   io.on('connection', (socket) => {
+    socket.join(this.roomCode);
+    if (this.socket) {
+      socket.emit('returnedHandshake');
+      return;
+    }
     this.socket = socket;
     socket.on('handshake', async () => {
       try {
@@ -72,7 +84,7 @@ Socket.prototype.init = function() {
 }
 Socket.prototype.sendMessageToClient = function(context, msg) {
   if (this.socket) {
-    this.socket.emit('message', { context, msg });
+    io.to(this.roomCode).emit('message', { context, msg });
   }
 }
 Socket.prototype.clientInit = async function() {
@@ -82,6 +94,7 @@ Socket.prototype.clientInit = async function() {
     '\nBot username: ', process.env.BOT_USERNAME,
     '\n*************',
   );
+  console.log(this.getLoadedPlugins());
   try {
     await this.client.connect();
   }
@@ -91,9 +104,49 @@ Socket.prototype.clientInit = async function() {
 }
 Socket.prototype.onMessageHandler = function(target, context, msg, self) {
   this.sendMessageToClient(context, msg);
-  console.info('context :', context, 'twitchSocket.js@94');
   if (self) return;
-  this.client.say(target, 'Message Received');
+  const message = msg.split(' ');
+  if (!this.commands[message[0]]) return;
+  const key = message[0];
+  // check for basic commands (ie !help)
+
+  // check for advanced commands (ie !gw2 account)
+  const command = message[1];
+  this.handleCommand(target, key, command)
+  //   .then((message) => {
+  //   this.client.say(target, 'Message Received');
+  // }).catch((error) => {
+  //   this.client.say(target, error.message);
+  // });
+}
+
+Socket.prototype.handleCommand = async function(target, key, command) {
+  const func = (this.commands.resolvers[key]).bind(this.commands.pluginObjects[key]);
+  try {
+    const response = await func(command);
+    console.log('response :', response, 'twitchSocket.js@127');
+    this.client.say(target, response);
+  }
+  catch (error) {
+    return new Error(error);
+  }
+}
+
+Socket.prototype.registerCommandPlugin = async function(plugin) {
+  const newPlugin = new plugin();
+  await newPlugin.loadOptions();
+  if (!newPlugin.commandKey) return new Error('No commandKey string defined in plugin object.');
+  if (!newPlugin.commandList) return new Error('No commandList object defined in plugin object.');
+  if (!newPlugin.resolver) return new Error('No executeCommand function defined in plugin object.');
+  this.commands[newPlugin.commandKey] = newPlugin.commandList;
+  this.commands.resolvers[newPlugin.commandKey] = newPlugin.resolver;
+  this.commands.pluginObjects[newPlugin.commandKey] = newPlugin;
+}
+
+Socket.prototype.getLoadedPlugins = function() {
+  return Object.entries(this.commands.pluginObjects).reduce((total, current) => {
+    return total + current[1].name + ' ';
+  }, 'Loaded plugins: ');
 }
 
 export default Socket;

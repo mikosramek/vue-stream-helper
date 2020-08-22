@@ -2,6 +2,7 @@ import { app, protocol, BrowserWindow } from 'electron';
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
 
+import GuildWars from '@/Node/GuildWars2';
 import TwitchSocket from './twitchSocket';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -40,6 +41,29 @@ function createWindow() {
 
   win.on('closed', () => {
     win = null;
+  });
+}
+
+const subWindows = [];
+
+function createSubWindow(height, width, subURL) {
+  let newWindow = new BrowserWindow({
+    height,
+    width,
+    webPreferences: {
+      nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
+    },
+  });
+  if (process.env.WEBPACK_DEV_SERVER_URL) {
+    newWindow.loadURL(process.env.WEBPACK_DEV_SERVER_URL + subURL);
+  } else {
+    createProtocol('app');
+    win.loadURL(`app://./${subURL}`);
+  }
+  subWindows.push(newWindow);
+  newWindow.on('closed', () => {
+    subWindows.splice(subWindows.indexOf(newWindow), 1);
+    newWindow = null;
   });
 }
 
@@ -90,5 +114,10 @@ if (isDevelopment) {
   }
 }
 
-const socket = new TwitchSocket();
+const socket = new TwitchSocket(createSubWindow);
 socket.init();
+try {
+  socket.registerCommandPlugin(GuildWars);
+} catch (error) {
+  console.error(error.message);
+}
