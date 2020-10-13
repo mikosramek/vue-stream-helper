@@ -5,8 +5,12 @@ Vue.use(Vuex);
 
 export default new Vuex.Store({
   state: {
+    showConnection: true,
   },
   mutations: {
+    setConnectionShow(state, newState) {
+      state.showConnection = newState;
+    },
   },
   actions: {
   },

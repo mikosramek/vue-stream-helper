@@ -1,9 +1,10 @@
 import express from 'express';
-import http from "http";
+import http from 'http';
 import socket from 'socket.io';
 import bodyParser from 'body-parser';
 import tmi from 'tmi.js';
 import { channelName } from './settings.json';
+import fileIO from './Node/io';
 
 const expressApp = express();
 const httpServer = http.createServer(expressApp);
@@ -29,12 +30,9 @@ expressApp.get('/', (req, res) => {
     .end();
 });
 
-
 // client.on('connected', onConnectedHandler);
 // client.on('cheer', onCheerHandler);
 // client.on('subscription', onSubscriptionHandler);
-
-
 
 const TWITCH_OPTIONS = {
   identity: {
@@ -46,7 +44,7 @@ const TWITCH_OPTIONS = {
   ],
 };
 
-const Socket = function(createSubWindow) {
+const Socket = function (createSubWindow) {
   this.socket = null;
   this.client = null;
   this.room = null;
@@ -55,11 +53,39 @@ const Socket = function(createSubWindow) {
     resolvers: {},
     pluginObjects: {},
   };
+  this.registeredOptions = {};
   this.createSubWindow = createSubWindow;
-}
-Socket.prototype.init = function() {
+};
+Socket.prototype.init = function () {
   io.on('connection', (socket) => {
     socket.join(this.roomCode);
+    console.info('Socket has connected.');
+
+    socket.on('get:options', () => {
+      console.log('Return options.');
+      socket.emit('return:options', this.getLoadedPluginOptions());
+    });
+    socket.on('update:options', (updatedOptions) => {
+      console.info('update:options', updatedOptions, 'twitchSocket.js@84');
+    });
+    socket.on('openOptions', () => {
+      console.log('Creating option windows.');
+      this.createSubWindow(500, 300, 'options');
+    });
+
+    socket.on('registerFileReader', (data) => {
+      const { optionsName } = data;
+      socket.on(`${optionsName}:update`, (newOptions) => {
+        // write to file
+        console.log(newOptions);
+      });
+      socket.on(`${optionsName}:get`, async () => {
+        // get file
+        const fileData = await fileIO.readFile(`${optionsName}.json`);
+        socket.emit(`${optionsName}:data`, fileData);
+      });
+    });
+
     if (this.socket) {
       socket.emit('returnedHandshake');
       return;
@@ -69,8 +95,7 @@ Socket.prototype.init = function() {
       try {
         await this.clientInit();
         socket.emit('returnedHandshake');
-      }
-      catch (error) {
+      } catch (error) {
         console.error(error.message);
       }
     });
@@ -80,14 +105,14 @@ Socket.prototype.init = function() {
     console.info(`listening on *:${port}`);
   });
   this.client = new tmi.client(TWITCH_OPTIONS);
-  this.client.on('message', (target, context, msg, self) => { this.onMessageHandler(target, context, msg, self) });
-}
-Socket.prototype.sendMessageToClient = function(context, msg) {
+  this.client.on('message', (target, context, msg, self) => { this.onMessageHandler(target, context, msg, self); });
+};
+Socket.prototype.sendMessageToClient = function (context, msg) {
   if (this.socket) {
     io.to(this.roomCode).emit('message', { context, msg });
   }
-}
-Socket.prototype.clientInit = async function() {
+};
+Socket.prototype.clientInit = async function () {
   console.info(
     '*************\nConnect to: ',
     channelName,
@@ -97,12 +122,11 @@ Socket.prototype.clientInit = async function() {
   console.log(this.getLoadedPlugins());
   try {
     await this.client.connect();
-  }
-  catch (error) {
+  } catch (error) {
     console.error(error.message);
   }
-}
-Socket.prototype.onMessageHandler = function(target, context, msg, self) {
+};
+Socket.prototype.onMessageHandler = function (target, context, msg, self) {
   this.sendMessageToClient(context, msg);
   if (self) return;
   const message = msg.split(' ');
@@ -112,28 +136,28 @@ Socket.prototype.onMessageHandler = function(target, context, msg, self) {
 
   // check for advanced commands (ie !gw2 account)
   const command = message[1];
-  this.handleCommand(target, key, command)
+  this.handleCommand(target, key, command);
   //   .then((message) => {
   //   this.client.say(target, 'Message Received');
   // }).catch((error) => {
   //   this.client.say(target, error.message);
   // });
-}
+};
 
-Socket.prototype.handleCommand = async function(target, key, command) {
+Socket.prototype.handleCommand = async function (target, key, command) {
   const func = (this.commands.resolvers[key]).bind(this.commands.pluginObjects[key]);
   try {
     const response = await func(command);
     console.log('response :', response, 'twitchSocket.js@127');
     this.client.say(target, response);
-  }
-  catch (error) {
+    return response;
+  } catch (error) {
     return new Error(error);
   }
-}
+};
 
-Socket.prototype.registerCommandPlugin = async function(plugin) {
-  const newPlugin = new plugin();
+Socket.prototype.registerCommandPlugin = async function (Plugin) {
+  const newPlugin = new Plugin();
   await newPlugin.loadOptions();
   if (!newPlugin.commandKey) return new Error('No commandKey string defined in plugin object.');
   if (!newPlugin.commandList) return new Error('No commandList object defined in plugin object.');
@@ -141,12 +165,28 @@ Socket.prototype.registerCommandPlugin = async function(plugin) {
   this.commands[newPlugin.commandKey] = newPlugin.commandList;
   this.commands.resolvers[newPlugin.commandKey] = newPlugin.resolver;
   this.commands.pluginObjects[newPlugin.commandKey] = newPlugin;
-}
+  return true;
+};
 
-Socket.prototype.getLoadedPlugins = function() {
-  return Object.entries(this.commands.pluginObjects).reduce((total, current) => {
-    return total + current[1].name + ' ';
-  }, 'Loaded plugins: ');
-}
+Socket.prototype.getLoadedPlugins = function () {
+  return Object.entries(this.commands.pluginObjects).reduce((total, current) => `${total + current[1].name} `, 'Loaded plugins: ');
+};
+
+Socket.prototype.getLoadedPluginOptions = function () {
+  console.info(this.commands.pluginObjects, 'twitchSocket.js@167');
+
+  const pluginArray = Object.entries(this.commands.pluginObjects);
+  return pluginArray.map(([key, value]) => {
+    const {
+      commandKey, name, version, commandList,
+    } = value;
+    return {
+      name,
+      commandKey,
+      version,
+      commandList,
+    };
+  });
+};
 
 export default Socket;

@@ -24,20 +24,22 @@ export default {
   },
   mounted() {
     this.$socket.registerMessageHandler(this.handleIncomingMessage);
-    this.messages.push({
-      color: '#D9876B',
-      username: 'magicmiko2',
-      mod: false,
-      subscriber: false,
-      msg: 'This is a test message',
-    });
-    this.messages.push({
-      color: '#D9876B',
-      username: 'magicmiko2',
-      mod: false,
-      subscriber: false,
-      msg: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit. Ducimus incidunt, labore! Aliquam placeat quas ratione reiciendis sed vel voluptates. Quae?',
-    });
+    // this.messages.push({
+    //   color: '#D9876B',
+    //   username: 'magicmiko2',
+    //   mod: false,
+    //   subscriber: false,
+    //   msg: 'This is a test message',
+    // });
+    // this.messages.push({
+    //   color: '#D9876B',
+    //   username: 'magicmiko2',
+    //   mod: false,
+    //   subscriber: false,
+    //   msg: 'Lorem ipsum dolor sit amet,
+    //   consectetur adipisicing elit. Ducimus incidunt, labore!
+    //   Aliquam placeat quas ratione reiciendis sed vel voluptates. Quae?',
+    // });
 
     // this.testInterval = setInterval(() => {
     //   this.messages.push({

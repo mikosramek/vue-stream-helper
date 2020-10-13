@@ -1,3 +1,10 @@
 {
-  "channelName" : "magicmiko2"
+  "channelName" : "magicmiko2",
+  "plugins" : [
+    {
+      "name" : "GuildWars2ItemGoals",
+      "load" : "true",
+      "path" : "/guildwars2/goals"
+    }
+  ]
 }

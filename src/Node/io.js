@@ -36,25 +36,23 @@ const IO = function (baseFolder) {
     );
   };
 
-  this.readFile = (fileName) => {
-    return new Promise((res) => {
-      this.checkFile(
-        fileName,
-        fs.readFile(
-          this.filePath + fileName,
-          'utf-8',
-          (err, data) => {
-            if (err) throw err;
-            if (data !== '') {
-              res(JSON.parse(data));
-            } else {
-              res('');
-            }
-          },
-        ),
-      );
-    });
-  };
+  this.readFile = (fileName) => new Promise((res) => {
+    this.checkFile(
+      fileName,
+      fs.readFile(
+        this.filePath + fileName,
+        'utf-8',
+        (err, data) => {
+          if (err) throw err;
+          if (data !== '') {
+            res(JSON.parse(data));
+          } else {
+            res('');
+          }
+        },
+      ),
+    );
+  });
 
   this.checkFile = async (fileName, callback) => {
     console.log('Checking file...', 'io.js@58');
